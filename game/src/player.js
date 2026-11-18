@@ -127,8 +127,10 @@ export class Player {
   updateCamera(camera, dt, focusPos, focusYaw) {
     // focusPos/focusYaw: the car when driving, the player otherwise.
     const yaw = focusYaw !== undefined ? focusYaw : this.camYaw;
-    const dist = focusYaw !== undefined ? 11 : this.camDist;
-    const height = focusYaw !== undefined ? 4.8 : 2.6 + this.camPitch * 4;
+    const dist = focusYaw !== undefined ? 12 : this.camDist;
+    // A low, near-level chase camera: steep look-down angles make the flat
+    // ground planes (sidewalks especially) swallow the frame.
+    const height = focusYaw !== undefined ? 5.6 : 2.8 + this.camPitch * 2.0;
     const tx = focusPos.x, ty = focusPos.y + (focusYaw !== undefined ? 1.2 : 1.6), tz = focusPos.z;
     const cx = tx + Math.sin(yaw) * dist;
     const cz = tz + Math.cos(yaw) * dist;

@@ -20,7 +20,7 @@ export class Particles {
     geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
     const mat = new THREE.PointsMaterial({
-      size: 0.55, vertexColors: true, transparent: true, opacity: 0.9,
+      size: 0.42, vertexColors: true, transparent: true, opacity: 0.75,
       depthWrite: false, sizeAttenuation: true,
     });
     this.points = new THREE.Points(geo, mat);

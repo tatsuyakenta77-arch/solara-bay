@@ -7,6 +7,34 @@ import { CONFIG, mulberry32, clamp } from './config.js';
 
 const STREETS = [-198, -154, -110, -66, -22, 22, 66, 110, 154, 198];
 
+function makeSidewalkTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#6f6a5e'; g.fillRect(0, 0, 128, 128);
+  // Slight per-slab tone variation + dark joints every 32 px.
+  const rnd = mulberry32(4242);
+  for (let y = 0; y < 4; y++) {
+    for (let x = 0; x < 4; x++) {
+      const v = 96 + Math.floor(rnd() * 18);
+      g.fillStyle = `rgb(${v},${v - 4},${v - 12})`;
+      g.fillRect(x * 32 + 2, y * 32 + 2, 28, 28);
+    }
+  }
+  g.strokeStyle = 'rgba(52,48,42,0.9)';
+  g.lineWidth = 3;
+  for (let i = 0; i <= 4; i++) {
+    g.beginPath(); g.moveTo(i * 32, 0); g.lineTo(i * 32, 128); g.stroke();
+    g.beginPath(); g.moveTo(0, i * 32); g.lineTo(128, i * 32); g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  // Anisotropy keeps the slab grid readable at the grazing angles a low
+  // chase camera sees it at, instead of mip-blurring to flat cream.
+  tex.anisotropy = 8;
+  return tex;
+}
+
 function makeWindowTexture(base, lit) {
   const c = document.createElement('canvas');
   c.width = 128; c.height = 256;
@@ -22,6 +50,7 @@ function makeWindowTexture(base, lit) {
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
   return tex;
 }
 
@@ -80,7 +109,16 @@ export class World {
 
     // Roads: asphalt strips along every street, both directions.
     const roadMat = new THREE.MeshLambertMaterial({ color: CONFIG.ASPHALT });
-    const walkMat = new THREE.MeshLambertMaterial({ color: CONFIG.SIDEWALK_COLOR });
+    // Sidewalks get a concrete-slab texture so they read as pavement, not a
+    // blank wall, at the grazing angles a chase camera sees them at.
+    const slabTexH = makeSidewalkTexture();
+    slabTexH.wrapS = THREE.RepeatWrapping; slabTexH.wrapT = THREE.RepeatWrapping;
+    slabTexH.repeat.set(160, 1);
+    const slabTexV = slabTexH.clone();
+    slabTexV.needsUpdate = true;
+    slabTexV.repeat.set(1, 160);
+    const walkMatH = new THREE.MeshLambertMaterial({ map: slabTexH });
+    const walkMatV = new THREE.MeshLambertMaterial({ map: slabTexV });
     for (const s of STREETS) {
       for (const horizontal of [true, false]) {
         // NOTE: a vertical strip is built with swapped dimensions and the
@@ -98,7 +136,7 @@ export class World {
         for (const side of [-1, 1]) {
           const walk = new THREE.Mesh(
             horizontal ? new THREE.PlaneGeometry(H * 2 + 40, CONFIG.SIDEWALK) : new THREE.PlaneGeometry(CONFIG.SIDEWALK, H * 2 + 40),
-            walkMat,
+            horizontal ? walkMatH : walkMatV,
           );
           walk.rotation.x = -Math.PI / 2;
           const off = CONFIG.ROAD_HALF + CONFIG.SIDEWALK / 2;
@@ -110,10 +148,13 @@ export class World {
       }
     }
 
-    // Centre dashes: one instanced mesh for the whole city.
+    // Centre dashes: one instanced mesh for the whole city. The count must
+    // match the loop exactly (23 positions per street, 2 instances each):
+    // drawing more instances than the buffer holds reads out-of-bounds
+    // matrices and can splat giant phantom boxes across the frame.
     const dashGeo = new THREE.BoxGeometry(2.2, 0.06, 0.28);
     const dashMat = new THREE.MeshBasicMaterial({ color: 0xf5e9c8 });
-    const dashCount = STREETS.length * 2 * 22;
+    const dashCount = STREETS.length * 2 * 23;
     const dashes = new THREE.InstancedMesh(dashGeo, dashMat, dashCount);
     const m4 = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -130,6 +171,7 @@ export class World {
       }
     }
     dashes.count = di;
+    dashes.instanceMatrix.needsUpdate = true;
     scene.add(dashes);
 
     // Buildings: one or two per block, varied heights and colours, window texture.
@@ -213,7 +255,7 @@ export class World {
     scene.add(this.beacon);
 
     // Lighting: warm sun + sky fill. updateLighting() moves the sun with the clock.
-    this.sun = new THREE.DirectionalLight(0xfff2d0, 2.6);
+    this.sun = new THREE.DirectionalLight(0xfff2d0, 1.9);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1024, 1024);
     this.sun.shadow.camera.left = -260; this.sun.shadow.camera.right = 260;
@@ -409,8 +451,8 @@ export class World {
     this.scene.background = sky;
     if (this.scene.fog) this.scene.fog.color.copy(sky);
     this.sun.color.setHex(sunset > 0.5 ? 0xffb36b : 0xfff2d0);
-    this.sun.intensity = 2.6 - sunset * 0.7;
-    this.hemi.intensity = 0.9 - sunset * 0.25;
+    this.sun.intensity = 1.9 - sunset * 0.5;
+    this.hemi.intensity = 0.75 - sunset * 0.2;
   }
 
   isOnRoad(x, z) {

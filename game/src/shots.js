@@ -17,14 +17,18 @@ export function stageShot(G, name) {
   // Clear any parked-car randomness: use the same starting arrangement.
   if (name === 'cover') {
     // Hero: player beside a red car on a sunlit avenue, mission 1 live.
+    // The camera sits south-west of the player, looking north-east down the
+    // avenue so the road, buildings and palms fill the frame.
     const car = G.parked[0];
-    car.pos.set(22, 0, 40);
+    car.pos.set(44, 0, 22);
     car.yaw = Math.PI / 2;
     car.mesh.position.copy(car.pos);
     car.mesh.rotation.y = car.yaw;
-    G.player.reset(26, 36, Math.PI * 0.55);
-    G.player.camYaw = Math.PI * 0.82;
-    G.player.camPitch = 0.3;
+    // The cover car is always the classic red one.
+    car.mesh.children[0].material.color.setHex(0xc0392b);
+    G.player.reset(48, 27, Math.PI * 0.55);
+    G.player.camYaw = -0.6;
+    G.player.camPitch = 0.25;
     G.missions.startMission(0);
     s.money = 1250;
     s.weapon = 'pistol';
@@ -42,13 +46,20 @@ export function stageShot(G, name) {
     G.enterCar(car, true);
     G.player.camYaw = Math.PI * 1.5;
     G.police.addWanted(s, 3, 'Wanted: 3 stars');
-    // Two cruisers right behind, one ahead cutting across.
+    // Cruisers ahead of the player, in view of the chase camera: one
+    // head-on in the oncoming lane, one cutting across from the right.
+    const cruiserSpots = [
+      { x: 14, z: -27, yaw: -Math.PI / 2 },
+      { x: 30, z: -32, yaw: Math.PI },
+      { x: -8, z: -14, yaw: Math.PI / 2 },
+    ];
     for (let i = 0; i < 3; i++) {
       const c = G.police._spawnCar(G.player.pos);
       if (c) {
-        c.pos.set(-22 - 26 - i * 14, 0, -22 + (i % 2 ? 3 : -3));
-        c.yaw = Math.PI / 2;
+        c.pos.set(cruiserSpots[i].x, 0, cruiserSpots[i].z);
+        c.yaw = cruiserSpots[i].yaw;
         c.mesh.position.copy(c.pos);
+        c.mesh.rotation.y = c.yaw;
       }
     }
     s.money = 3420;
@@ -62,9 +73,12 @@ export function stageShot(G, name) {
     s.missionIndex = 2;
   } else if (name === 'mission') {
     // Mission 4 in progress: warehouse shootout, waypoint + gunmen.
-    G.player.reset(W.warehouse.x - 30, W.warehouse.z + 8, Math.PI * 0.5);
-    G.player.camYaw = Math.PI * 0.72;
-    G.player.camPitch = 0.34;
+    // The player stands north-west of the warehouse on open ground and
+    // the camera looks south-east at the shed, the beacon and the yard
+    // (close-in angles put the shed's wall across the whole frame).
+    G.player.reset(W.warehouse.x - 16, W.warehouse.z - 36, Math.PI * 0.25);
+    G.player.camYaw = Math.PI * 1.25;
+    G.player.camPitch = 0.25;
     G.missions.startMission(3);
     G.player.setArmed(true);
     s.weapon = 'pistol';
@@ -80,10 +94,11 @@ export function stageShot(G, name) {
     car.mesh.position.copy(car.pos);
     car.mesh.rotation.y = car.yaw;
   } else if (name === 'street') {
-    // Street level on foot: pedestrians, traffic, storefronts.
-    G.player.reset(66, 74, Math.PI * 0.9);
+    // Street level on foot: pedestrians, traffic, storefronts. The player
+    // stands on the road itself, looking north down the avenue.
+    G.player.reset(66, 66, Math.PI * 0.9);
     G.player.camYaw = Math.PI * 1.02;
-    G.player.camPitch = 0.22;
+    G.player.camPitch = 0.2;
     G.player.camDist = 6;
     s.weapon = 'fists';
     s.money = 750;

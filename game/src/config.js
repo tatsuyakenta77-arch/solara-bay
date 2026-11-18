@@ -7,7 +7,7 @@ export const CONFIG = {
   CITY_HALF: 220,
   BLOCK: 44,
   ROAD_HALF: 5.5,
-  SIDEWALK: 3,
+  SIDEWALK: 2.4,
   // Player on foot
   WALK_SPEED: 5.2,
   SPRINT_SPEED: 9.0,
