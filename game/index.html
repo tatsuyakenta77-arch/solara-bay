@@ -3,16 +3,105 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block Dodger</title>
-<style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #11141b; }
-  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  /* Read aloud, never shown: the status line screen readers announce. */
-  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-</style>
+<title>Solara Bay — Open-World Crime</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
 </head>
 <body>
-<canvas id="game" aria-label="Block Dodger: move the paddle left and right to dodge falling blocks and catch coins"></canvas>
+<canvas id="game" aria-label="Solara Bay: an open-world crime game. Drive, steal cars, outrun the police and run missions across a coastal city."></canvas>
+
+<!-- In-game HUD -->
+<div id="hud" class="hidden">
+  <div id="hud-top-left">
+    <div id="hud-money">$250</div>
+    <div id="hud-clock">9:00 AM</div>
+    <div id="hud-stars">☆☆☆☆☆</div>
+  </div>
+  <div id="hud-objective-box">
+    <div id="hud-objective">Welcome to Solara Bay</div>
+    <div id="hud-objective-sub"></div>
+  </div>
+  <canvas id="minimap" width="190" height="190"></canvas>
+  <div id="hud-bottom-left">
+    <div class="bar-label"><span>HEALTH</span><span id="health-text">100 HP</span></div>
+    <div class="bar"><div id="health-fill"></div></div>
+    <div class="bar-label"><span>ARMOR</span></div>
+    <div class="bar armor"><div id="armor-fill"></div></div>
+  </div>
+  <div id="hud-bottom-right">
+    <div id="hud-weapon">Fists</div>
+    <div id="hud-ammo">—</div>
+    <div id="hud-speed-box" class="hidden"><span id="hud-speed">0</span> km/h</div>
+  </div>
+  <div id="hud-message" class="hidden"></div>
+  <div id="hud-hint"></div>
+  <div id="crosshair" class="hidden"><span>+</span></div>
+</div>
+
+<!-- Title screen -->
+<div id="title-screen" class="screen">
+  <div class="panel">
+    <h1 class="game-title">SOLARA BAY</h1>
+    <p class="tagline">A sun-soaked open-world crime story</p>
+    <p class="story">New in town, broke and unknown. Rico and Mara have work for you — steal cars,
+      run packages, dodge the law, and pull off the big score. The whole city is yours to take.</p>
+    <div class="menu-buttons">
+      <button id="btn-new" class="menu-btn primary">New Game</button>
+      <button id="btn-continue" class="menu-btn hidden">Continue</button>
+    </div>
+    <p class="section-label">MISSIONS</p>
+    <div id="mission-list" class="mission-list"></div>
+    <p class="controls">WASD move &amp; drive · Mouse look · Shift sprint · Space jump / handbrake ·
+      E steal car · Click shoot · 1/2 weapons · R reload · M mute · Esc pause</p>
+    <p class="fineprint">An original game. Solara Bay, its people and its story are invented — no real city, no borrowed names.</p>
+  </div>
+</div>
+
+<!-- Pause screen -->
+<div id="pause-screen" class="screen hidden">
+  <div class="panel">
+    <h1>PAUSED</h1>
+    <p class="tagline">Solara Bay waits for no one — except right now.</p>
+    <div class="menu-buttons">
+      <button id="btn-resume" class="menu-btn primary">Resume</button>
+      <button id="btn-save" class="menu-btn">Save Game</button>
+      <button id="btn-settings" class="menu-btn">Settings</button>
+      <button id="btn-quit" class="menu-btn">Quit to Title</button>
+    </div>
+    <div id="settings-panel" class="hidden">
+      <label>Volume <input id="setting-volume" type="range" min="0" max="100" value="70"></label>
+      <label>Mouse sensitivity <input id="setting-sensitivity" type="range" min="20" max="200" value="100"></label>
+      <button id="setting-mute" class="menu-btn small">Mute (M)</button>
+    </div>
+    <p class="controls">Tip: hide from the police until your wanted stars fade — or grab armor and ammo pickups around town.</p>
+  </div>
+</div>
+
+<!-- Death / busted screen -->
+<div id="dead-screen" class="screen hidden">
+  <div class="panel">
+    <h1 id="dead-title">WASTED</h1>
+    <p id="dead-text" class="tagline">You died.</p>
+    <div class="menu-buttons">
+      <button id="btn-respawn" class="menu-btn primary">Respawn at Hospital (−$200)</button>
+    </div>
+  </div>
+</div>
+
+<!-- Story complete screen -->
+<div id="complete-screen" class="screen hidden">
+  <div class="panel">
+    <h1>THE BIG SCORE</h1>
+    <p class="tagline">Every mission done. Solara Bay is yours.</p>
+    <div class="menu-buttons">
+      <button id="btn-freeroam" class="menu-btn primary">Keep Playing — Free Roam</button>
+    </div>
+  </div>
+</div>
+
 <p id="status" role="status" aria-live="polite"></p>
 <script type="module" src="./src/main.js"></script>
 </body>

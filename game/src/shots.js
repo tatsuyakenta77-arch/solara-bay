@@ -1,79 +1,113 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+// Solara Bay — deterministic screenshot staging behind ?shot=cover|chase|
+// mission|street. Each scene arranges the real game (real city, real cars,
+// real police, real mission state) and a fixed camera, then the loop runs
+// live for a short settle so traffic and particles are mid-motion.
+import { CONFIG } from './config.js';
 
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
-
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
+export function stageShot(G, name) {
+  const s = G.state;
+  const W = G.world.landmarks;
+  s.shotMode = name;
+  s.mode = 'playing';
+  s.muted = true;
+  G.audio.setMuted(true);
+  // A sunny late-afternoon look for every shot.
+  s.clockMinutes = 16 * 60 + 40;
+  G.world.updateLighting(s.clockMinutes);
+  // Clear any parked-car randomness: use the same starting arrangement.
+  if (name === 'cover') {
+    // Hero: player beside a red car on a sunlit avenue, mission 1 live.
+    const car = G.parked[0];
+    car.pos.set(22, 0, 40);
+    car.yaw = Math.PI / 2;
+    car.mesh.position.copy(car.pos);
+    car.mesh.rotation.y = car.yaw;
+    G.player.reset(26, 36, Math.PI * 0.55);
+    G.player.camYaw = Math.PI * 0.82;
+    G.player.camPitch = 0.3;
+    G.missions.startMission(0);
+    s.money = 1250;
+    s.weapon = 'pistol';
+    s.health = 100; s.armor = 50;
+    s.message = 'First Wheels — steal a car and bring it to Marina Row';
+    s.messageTimer = 999;
+  } else if (name === 'chase') {
+    // Police pursuit: player driving, 3 stars, cruisers closing in.
+    const car = G.parked[1];
+    car.pos.set(-22, 0, -22);
+    car.yaw = Math.PI / 2;
+    car.speed = 18;
+    car.mesh.position.copy(car.pos);
+    car.mesh.rotation.y = car.yaw;
+    G.enterCar(car, true);
+    G.player.camYaw = Math.PI * 1.5;
+    G.police.addWanted(s, 3, 'Wanted: 3 stars');
+    // Two cruisers right behind, one ahead cutting across.
+    for (let i = 0; i < 3; i++) {
+      const c = G.police._spawnCar(G.player.pos);
+      if (c) {
+        c.pos.set(-22 - 26 - i * 14, 0, -22 + (i % 2 ? 3 : -3));
+        c.yaw = Math.PI / 2;
+        c.mesh.position.copy(c.pos);
+      }
     }
-  }
-  return Infinity;
-}
-
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
-  }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
+    s.money = 3420;
+    s.speedKmh = 68;
+    s.message = 'Lose the cops — stay out of sight until the heat dies';
+    s.messageTimer = 999;
+    s.missionObjective = 'Hot Pursuit — reach 3 stars, then lose the police';
+    s.missionActive = true;
+    s.missionId = 3;
+    s.missionStage = 1;
+    s.missionIndex = 2;
+  } else if (name === 'mission') {
+    // Mission 4 in progress: warehouse shootout, waypoint + gunmen.
+    G.player.reset(W.warehouse.x - 30, W.warehouse.z + 8, Math.PI * 0.5);
+    G.player.camYaw = Math.PI * 0.72;
+    G.player.camPitch = 0.34;
+    G.missions.startMission(3);
+    G.player.setArmed(true);
+    s.weapon = 'pistol';
+    s.ammoMag = 10; s.ammoReserve = 48;
+    s.money = 2100;
+    s.wanted = 1;
+    s.message = 'Warehouse Deal — clear the yard';
+    s.messageTimer = 999;
+    // A traffic car and pedestrians in the mid-ground for life.
+    const car = G.parked[2];
+    car.pos.set(W.warehouse.x - 8, 0, W.warehouse.z - 30);
+    car.yaw = 0;
+    car.mesh.position.copy(car.pos);
+    car.mesh.rotation.y = car.yaw;
+  } else if (name === 'street') {
+    // Street level on foot: pedestrians, traffic, storefronts.
+    G.player.reset(66, 74, Math.PI * 0.9);
+    G.player.camYaw = Math.PI * 1.02;
+    G.player.camPitch = 0.22;
+    G.player.camDist = 6;
+    s.weapon = 'fists';
+    s.money = 750;
+    s.missionObjective = 'Free roam — explore Solara Bay';
+    s.missionActive = false;
+    s.message = 'Solara Bay — Marina District';
+    s.messageTimer = 999;
+    // Pull a few pedestrians close to the player for the frame.
+    for (let i = 0; i < 5; i++) {
+      const p = G.pedestrians.peds[i];
+      p.x = 60 + i * 4;
+      p.z = 70 + (i % 2 ? 2 : -2);
+      p.horizontal = true;
+      p.street = 66;
+      p.side = 1;
     }
+    const car = G.parked[3];
+    car.pos.set(66, 0, 88);
+    car.yaw = 0;
+    car.mesh.position.copy(car.pos);
+    car.mesh.rotation.y = car.yaw;
   }
-  return best;
-}
-
-/**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
- */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
-  }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
-  }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
+  // Let the world settle (traffic moves, smoke rises) before the shot.
+  G.shotFrames = 0;
+  G.shotReadyAfter = 75;
+  G.shotStart = performance.now();
 }
